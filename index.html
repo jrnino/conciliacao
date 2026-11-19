@@ -1,0 +1,479 @@
+<title>Conciliação Bancária</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: envio dos arquivos no topo, ponte do saldo, pontos de atenção por tipo e abas de conferência */
+:root{--bg:#f4f6f7;--surface:#fff;--fg:#1a2730;--muted:#5b6b75;--line:#dbe2e6;--accent:#1f5f7a;--accent-soft:#e1eef3;
+--ok:#1d7a4f;--ok-soft:#e0f2e9;--warn:#a85b00;--warn-soft:#fbeed8;--crit:#b3261e;--crit-soft:#f9e1de;--info:#3f5f8a;--info-soft:#e4ebf5;
+--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f171c;--surface:#172229;--fg:#e4ecf0;--muted:#92a4ae;--line:#2a3943;--accent:#6bb8d6;--accent-soft:#1c3340;--ok:#59c08f;--ok-soft:#173528;--warn:#e0a550;--warn-soft:#3a2c14;--crit:#f08a82;--crit-soft:#3f1d1a;--info:#8fb0e0;--info-soft:#1f2d44;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f171c;--surface:#172229;--fg:#e4ecf0;--muted:#92a4ae;--line:#2a3943;--accent:#6bb8d6;--accent-soft:#1c3340;--ok:#59c08f;--ok-soft:#173528;--warn:#e0a550;--warn-soft:#3a2c14;--crit:#f08a82;--crit-soft:#3f1d1a;--info:#8fb0e0;--info-soft:#1f2d44;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans);padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap>*,#out>*{min-width:0}
+#out{margin:0;width:100%}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:22px;margin:0;font-weight:600;text-wrap:balance}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.sub{color:var(--muted);margin:2px 0 0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.neg{color:var(--crit)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.drops{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:4px;cursor:pointer;background:var(--bg);min-width:0}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{font-weight:600}.drop span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.drop.ok{border-style:solid;border-color:var(--ok)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:4px;padding:7px 14px;cursor:pointer}
+:root[data-theme="dark"] .btn{color:#0f171c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#0f171c}}
+.btn.sec{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.banner{padding:8px 12px;border-radius:4px;background:var(--info-soft);color:var(--info);font-size:13px}
+.banner.err{background:var(--crit-soft);color:var(--crit)}
+.status{display:flex;align-items:center;gap:8px;font-weight:500}
+.status.ok{color:var(--ok)}.status.bad{color:var(--crit)}
+.dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.step{background:var(--surface);padding:10px 12px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.step .l{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.step .v{font-size:17px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.step.end{background:var(--ok-soft)}.step.end .v{color:var(--ok);font-weight:500}
+.step.bad{background:var(--crit-soft)}.step.bad .v{color:var(--crit)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted)}.kpi .v{font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}.kpi .s{font-size:12px;color:var(--muted)}
+.att{display:flex;flex-direction:column;gap:8px}
+details.fg{background:var(--surface);border:1px solid var(--line);border-radius:6px;min-width:0}
+details.fg>summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+details.fg>summary::-webkit-details-marker{display:none}
+details.fg>summary::before{content:'▸';color:var(--muted);width:10px}
+details.fg[open]>summary::before{content:'▾'}
+.pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.info{background:var(--info-soft);color:var(--info)}
+.fg .t{font-weight:600;flex:1 1 240px;min-width:0}.fg .n{font-family:var(--mono);color:var(--muted)}
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+details.fg .tw{border:0;border-top:1px solid var(--line);border-radius:0 0 6px 6px}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface);font-weight:600}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.cell{max-width:440px;overflow-wrap:anywhere}.cell small{display:block;color:var(--muted)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:600}
+.tab .c{font-family:var(--mono);font-size:12px;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:10px;margin-left:6px}
+input[type=search],select{font:inherit;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0}
+input[type=search]{flex:1 1 220px}
+.chip{font:inherit;font-size:12px;padding:3px 10px;border-radius:12px;background:var(--accent-soft);color:var(--accent);border:1px solid transparent;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);font-weight:600}
+.tag{font-size:11px;padding:1px 7px;border-radius:10px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.tag.w{background:var(--warn-soft);color:var(--warn)}.tag.c{background:var(--crit-soft);color:var(--crit)}
+.note{color:var(--muted);font-size:13px;margin:0}.foot{color:var(--muted);font-size:12px}
+details.items summary{cursor:pointer;color:var(--accent)} details.items small{display:block}
+textarea.fb{width:100%;height:120px;font-family:var(--mono);font-size:12px}
+</style>
+<div class="wrap">
+ <header>
+  <h1>Conciliação bancária</h1>
+  <p class="sub">Envie o extrato do banco (OFX) e o relatório do SIAFIC (XLSX) da mesma conta e do mesmo mês. A conferência roda no seu navegador e os arquivos não são enviados a lugar nenhum.</p>
+ </header>
+ <section class="card" aria-label="Envio dos arquivos">
+  <div class="drops">
+   <label class="drop" id="dropB"><b>1. Extrato do banco (.ofx)</b><span id="nameB">Clique ou arraste o arquivo aqui</span><input type="file" id="fileB" accept=".ofx,.OFX"></label>
+   <label class="drop" id="dropC"><b>2. Relatório do SIAFIC (.xlsx)</b><span id="nameC">Clique ou arraste o arquivo aqui</span><input type="file" id="fileC" accept=".xlsx,.XLSX"></label>
+  </div>
+  <div class="row"><button class="btn" id="go" disabled>Conciliar</button><span class="note" id="msg"></span></div>
+  <div id="banner"></div>
+ </section>
+ <div id="out" class="wrap" style="gap:20px"></div>
+ <p class="foot">Regra de sinal: entrada (crédito) no banco corresponde a débito no contábil, e saída (débito) no banco corresponde a crédito no contábil. Os históricos do OFX do Banco do Brasil perdem alguns acentos na origem; os mais comuns são restaurados. O navegador não permite baixar arquivos a partir desta página, por isso o resultado sai pelos botões de copiar, que colam direto no Excel.</p>
+</div>
+<script>
+/* ===== Leitura de arquivos ===== */
+const T=s=>s==null?'':String(s);
+const norm=s=>T(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const tail=x=>T(x).replace(/\D/g,'').replace(/^0+/,'');
+const digits=x=>T(x).replace(/\D/g,'').replace(/^0+/,'');
+const STOP=new Set(['LTDA','EIRELI','ME','EPP','SA','S','A','DE','DA','DO','DOS','DAS','E','LT','EI','CIA','MUNICIPIO','PREF','PREFEITURA']);
+const FIX=[['TRANSFER\ufffdNCIA','TRANSFERÊNCIA'],['ELETR\ufffdNICO','ELETRÔNICO'],['COBRAN\ufffdA','COBRANÇA'],['DEDU\ufffd\ufffdO','DEDUÇÃO'],['SA\ufffdDE','SAÚDE'],['EMPR\ufffdSTIMO','EMPRÉSTIMO'],['AUTOM\ufffdTICO','AUTOMÁTICO'],['RETEN\ufffd\ufffdO','RETENÇÃO'],['POUPAN\ufffdA','POUPANÇA'],['PREVID\ufffdNCIA','PREVIDÊNCIA'],['SAL\ufffdRIO','SALÁRIO'],['T\ufffdTULO','TÍTULO'],['D\ufffdBITO','DÉBITO'],['CR\ufffdDITO','CRÉDITO'],['FOLHA','FOLHA']];
+function isoFromSerial(n){const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000);return d.toISOString().slice(0,10)}
+function toISO(v){
+  if(typeof v==='number'&&v>30000&&v<80000&&Number.isFinite(v))return isoFromSerial(v);
+  if(typeof v==='string'){const m=v.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(m)return m[3]+'-'+m[2]+'-'+m[1]}
+  return null;
+}
+const dbr=s=>s&&s.length===10?s.slice(8)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'';
+function parseOFX(buf){
+  let txt;
+  try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
+  for(const [a,b] of FIX)txt=txt.split(a).join(b);
+  txt=txt.replace(/\ufffd/g,'?');
+  const tag=(blk,t)=>{const m=blk.match(new RegExp('<'+t+'>([^\\r\\n<]*)'));return m?m[1].trim():''};
+  const rows=[];
+  for(const m of txt.matchAll(/<STMTTRN>([\s\S]*?)(?:<\/STMTTRN>|(?=<STMTTRN>))/g)){
+    const blk=m[1],d=tag(blk,'DTPOSTED');
+    const v=parseFloat(tag(blk,'TRNAMT').replace(',','.'));
+    if(!d||!Number.isFinite(v))continue;
+    const memo=[tag(blk,'NAME'),tag(blk,'MEMO')].filter(Boolean).join(' - ').replace(/\s+/g,' ');
+    rows.push({data:d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8),cents:Math.round(v*100),doc:tag(blk,'CHECKNUM')||tag(blk,'REFNUM'),text:memo});
+  }
+  const bal=txt.match(/<LEDGERBAL>[\s\S]*?<BALAMT>([^\r\n<]*)[\s\S]*?(?:<DTASOF>([^\r\n<]*))?/);
+  const dts=tag(txt,'DTSTART'),dte=tag(txt,'DTEND'),asof=(txt.match(/<LEDGERBAL>[\s\S]*?<DTASOF>([^\r\n<]*)/)||[])[1]||'';
+  const f=s=>s?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):'';
+  return {rows,meta:{conta:tag(txt,'ACCTID'),agencia:tag(txt,'BRANCHID'),banco:tag(txt,'ORG')||tag(txt,'BANKID'),ini:f(dts.trim()),fim:f(dte.trim()),
+    ledger:bal?Math.round(parseFloat(bal[1].replace(',','.'))*100):null,asof:f(asof.trim())}};
+}
+function parseCont(sheetRows){
+  const rows=[];let conta='',ini='',fim='',saldoAnt=null,saldoAtual=null,ultimoSaldo=null,descr='';
+  for(const r of sheetRows){
+    const cells=r.filter(x=>x!==null&&x!==undefined&&x!=='').map(x=>typeof x==='string'?x.trim():x).filter(x=>x!=='');
+    if(!cells.length)continue;
+    const iso=toISO(cells[0]);
+    if(iso&&typeof cells[0]==='number'||(iso&&cells.length>3)){
+      const nums=cells.slice(1).filter(x=>typeof x==='number'),strs=cells.slice(1).filter(x=>typeof x==='string');
+      if(nums.length<3||!strs.length)continue;
+      const [deb,cre,sal]=nums.slice(-3);
+      const doc=strs[1]!==undefined?strs[1]:(nums.length>3?String(nums[0]):'');
+      rows.push({data:iso,cents:Math.round((deb-cre)*100),doc:T(doc),text:strs[0].replace(/\s+/g,' ')});
+      ultimoSaldo=Math.round(sal*100);continue;
+    }
+    for(let i=0;i<cells.length;i++){
+      const c=cells[i];if(typeof c!=='string')continue;
+      if(/^N[ºo°.]*\s*da Conta/i.test(c)){const n=cells.slice(i+1).find(x=>typeof x==='string');if(n&&!conta)conta=n}
+      const p=c.match(/Per[ií]odo:\s*(\d{2}\/\d{2}\/\d{4})\s*a\s*(\d{2}\/\d{2}\/\d{4})/i);if(p){ini=toISO(p[1]);fim=toISO(p[2])}
+      if(/^SALDO ANTERIOR/i.test(c)&&saldoAnt===null){const n=cells.slice(i+1).find(x=>typeof x==='number');if(n!==undefined)saldoAnt=Math.round(n*100)}
+      if(/^SALDO ATUAL/i.test(c)){const n=[...cells.slice(i+1)].reverse().find(x=>typeof x==='number');if(n!==undefined)saldoAtual=Math.round(n*100)}
+      if(/^Descri[cç][aã]o:/i.test(c)){const n=cells.slice(i+1).find(x=>typeof x==='string');if(n)descr=n}
+    }
+  }
+  return {rows,meta:{conta,ini,fim,saldoAnt:saldoAnt??0,saldoFinal:saldoAtual??ultimoSaldo,saldoUltimaLinha:ultimoSaldo,descr}};
+}
+/* Leitor mínimo de .xlsx (zip + xml), sem bibliotecas externas */
+async function inflateRaw(u8){const ds=new DecompressionStream('deflate-raw');const w=ds.writable.getWriter();w.write(u8);w.close();return new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+async function readXlsx(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf);let e=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-70000);i--)if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+  if(e<0)throw new Error('Arquivo não é um .xlsx válido');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files={};
+  for(let k=0;k<n;k++){
+    const method=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl));
+    files[name]={method,csz,off};p+=46+nl+el+cl;
+  }
+  const get=async name=>{const f=files[name];if(!f)return null;const lh=f.off,ln=dv.getUint16(lh+26,true),le=dv.getUint16(lh+28,true);
+    const data=u8.subarray(lh+30+ln+le,lh+30+ln+le+f.csz);const out=f.method===0?data:await inflateRaw(data);return new TextDecoder().decode(out)};
+  const parse=s=>new DOMParser().parseFromString(s,'application/xml');
+  const ss=[];const sst=await get('xl/sharedStrings.xml');
+  if(sst)for(const si of parse(sst).getElementsByTagName('si'))ss.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join(''));
+  const sheets=Object.keys(files).filter(f=>/^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort((a,b)=>parseInt(a.match(/\d+/))-parseInt(b.match(/\d+/)));
+  const col=ref=>{let c=0;for(const ch of ref.replace(/\d/g,''))c=c*26+ch.charCodeAt(0)-64;return c-1};
+  const out=[];
+  for(const name of sheets){
+    const doc=parse(await get(name));
+    for(const row of doc.getElementsByTagName('row')){
+      const arr=[];
+      for(const c of row.getElementsByTagName('c')){
+        const t=c.getAttribute('t'),v=c.getElementsByTagName('v')[0],idx=col(c.getAttribute('r')||'A1');
+        let val=null;
+        if(t==='s'&&v)val=ss[parseInt(v.textContent)];
+        else if(t==='inlineStr')val=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');
+        else if(t==='str'&&v)val=v.textContent;
+        else if(v&&v.textContent!==''){const x=Number(v.textContent);val=Number.isNaN(x)?v.textContent:x}
+        arr[idx]=val;
+      }
+      out.push(Array.from(arr,x=>x===undefined?null:x));
+    }
+  }
+  return out;
+}
+/* ===== Credor ===== */
+function credorBanco(m){
+  m=T(m);let r;
+  if(r=m.match(/(?:TRANSFER\S* (?:ENVIADA|RECEBIDA)|TRANSFERIDO PARA POUPAN\S*)\s*-\s*\d{2}\/\d{2}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?\s+(.+)$/i))return r[1].trim();
+  if(r=m.match(/\d{11,14}\s+(.+)$/))return r[1].trim();
+  if(r=m.match(/PAGAMENTO DE BOLETO\s*-\s*(.+)$/i))return r[1].trim();
+  if(r=m.match(/PIX\S*\s*-\s*(.+)$/i))return r[1].trim();
+  return '';
+}
+function credorCont(h){const r=T(h).match(/(?:Pago a|Recebido de)\s+(.+?)\s+-\s+Empenho/i);return r?r[1].trim():''}
+function empenho(h){const r=T(h).match(/Empenho:\s*([\d/]+)/i);return r?r[1]:''}
+function tokens(s){return norm(s).split(' ').filter(t=>t&&!STOP.has(t))}
+function nameScore(a,b){
+  const A=tokens(a),B=tokens(b);if(!A.length||!B.length)return 0;
+  let ok=0;for(const t of A){if(B.some(u=>u.startsWith(t)||t.startsWith(u)))ok++}
+  return ok/A.length;
+}
+/* ===== Conciliação ===== */
+const dayDiff=(a,b)=>Math.round((Date.parse(a)-Date.parse(b))/86400000);
+const sum=a=>a.reduce((s,x)=>s+x.cents,0);
+function classBanco(b){
+  const m=norm(b.text);
+  if(/TAR DOC TED|TARIFA|TAR /.test(m)&&!/ESTORNO/.test(m))return 'tarifa';
+  if(/DESBL/.test(m))return 'desbloqueio';
+  if(/BLOQ/.test(m))return 'bloqueio';
+  if(/APLIC|RESGATE/.test(m))return 'aplicacao';
+  if(b.cents>0)return 'entrada';
+  return 'saida';
+}
+function reconcile(bankIn,contIn,metaB,metaC){
+  const bank=bankIn.map((x,i)=>({...x,id:i,credor:credorBanco(x.text)}));
+  const cont=contIn.map((x,i)=>({...x,id:i,credor:credorCont(x.text),emp:empenho(x.text)}));
+  const bm=new Map(),cm=new Map(),groups=[];
+  const docmatch=(b,c)=>{const x=tail(b.doc),y=tail(c.doc);return !!(x&&y&&(x.endsWith(y)||y.endsWith(x)))};
+  const add=(bs,cs,regra,dias=0)=>{const g={id:groups.length,regra,b:bs,c:cs,dias};groups.push(g);bs.forEach(b=>bm.set(b.id,g.id));cs.forEach(c=>cm.set(c.id,g.id))};
+  const freeB=()=>bank.filter(b=>!bm.has(b.id)),freeC=()=>cont.filter(c=>!cm.has(c.id));
+  // 1) exato
+  for(const b of bank){
+    const cs=freeC().filter(c=>c.cents===b.cents&&c.data===b.data);if(!cs.length)continue;
+    cs.sort((x,y)=>(docmatch(b,y)-docmatch(b,x))||(nameScore(b.credor,y.credor)-nameScore(b.credor,x.credor)));
+    add([b],[cs[0]],docmatch(b,cs[0])?'Exato: data + valor + documento':'Exato: data + valor');
+  }
+  // 2) lote por documento na mesma data
+  for(const b of freeB()){
+    const cs=freeC().filter(c=>c.data===b.data&&docmatch(b,c)&&c.cents*b.cents>0);
+    if(cs.length>1&&sum(cs)===b.cents)add([b],cs,'Lote: soma por documento');
+  }
+  // 3) tolerância de data
+  for(const b of freeB()){
+    const cs=freeC().filter(c=>c.cents===b.cents&&Math.abs(dayDiff(c.data,b.data))<=3);if(!cs.length)continue;
+    cs.sort((x,y)=>(docmatch(b,y)-docmatch(b,x))||(nameScore(b.credor,y.credor)-nameScore(b.credor,x.credor))||(Math.abs(dayDiff(x.data,b.data))-Math.abs(dayDiff(y.data,b.data))));
+    add([b],[cs[0]],'Tolerância de data (±3 dias)',Math.abs(dayDiff(cs[0].data,b.data)));
+  }
+  // 4) agregado por data: documentos em comum
+  const dias=[...new Set(bank.map(b=>b.data))].sort();
+  for(const dia of dias){
+    const ub=freeB().filter(b=>b.data===dia),uc=freeC().filter(c=>c.data===dia);if(!ub.length||!uc.length)continue;
+    const cb=new Set(ub.map(b=>tail(b.doc))),docs=[...new Set(uc.map(c=>tail(c.doc)))].filter(d=>d&&cb.has(d));
+    if(!docs.length||docs.length>10)continue;
+    let done=false;
+    for(let mask=(1<<docs.length)-1;mask>0&&!done;mask--){
+      const sub=docs.filter((_,i)=>mask&(1<<i));
+      const bs=ub.filter(b=>sub.includes(tail(b.doc))),cs=uc.filter(c=>sub.includes(tail(c.doc)));
+      if(bs.length&&cs.length&&sum(bs)===sum(cs)){add(bs,cs,'Agregado: soma de itens do mesmo dia (ex.: FPM líquido de deduções)');done=true}
+    }
+  }
+  // 5) por documento no período
+  for(const doc of [...new Set(freeB().map(b=>tail(b.doc)))]){
+    if(!doc)continue;
+    const bs=freeB().filter(b=>tail(b.doc)===doc),cs=freeC().filter(c=>tail(c.doc)===doc);
+    if(bs.length&&cs.length&&sum(bs)===sum(cs))add(bs,cs,'Agregado: soma por documento no período');
+  }
+  // 6) bloqueio x desbloqueio
+  for(const x of freeB().filter(b=>classBanco(b)==='bloqueio')){
+    const y=freeB().find(b=>classBanco(b)==='desbloqueio'&&b.cents===-x.cents);
+    if(y)add([x,y],[],'Bloqueio + desbloqueio judicial (neutro)');
+  }
+  const pendB=freeB(),pendC=freeC();
+  /* ===== Diagnóstico ===== */
+  const findings=[];const F=(sev,titulo,detalhe,o={})=>findings.push({sev,titulo,detalhe,...o});
+  const obsB=new Map(),obsC=new Map();
+  const near=(b)=>{ // candidatos no contábil que sobrou
+    const out=[];
+    for(const c of pendC){
+      const dd=Math.abs(dayDiff(c.data,b.data)),same=Math.sign(c.cents)===Math.sign(b.cents);
+      if(!same)continue;
+      const dm=docmatch(b,c)&&tail(b.doc).length>=4&&tail(b.doc)!==tail(c.doc).slice(0,0);
+      const ns=nameScore(b.credor,c.credor);
+      if(c.cents===b.cents&&dd<=15)out.push({c,motivo:'mesmo valor, '+dd+' dias de diferença'});
+      else if(dm&&dd<=5)out.push({c,motivo:'mesmo documento, valor diferente (banco '+fmt(b.cents)+' × contábil '+fmt(c.cents)+', diferença '+fmt(b.cents-c.cents)+')'});
+      else if(ns>=0.8&&b.credor&&dd<=5)out.push({c,motivo:'mesmo credor, valor diferente (diferença '+fmt(b.cents-c.cents)+')'});
+    }
+    return out;
+  };
+  // só no banco
+  const tarifas=[];
+  for(const b of pendB){
+    const k=classBanco(b),n=near(b);
+    if(n.length){
+      const c=n[0].c;
+      F('crit','Possível divergência de '+(n[0].motivo.startsWith('mesmo valor')?'data':'valor')+': '+(b.credor||c.credor||'sem credor'),
+        'Banco: '+dbr(b.data)+' · '+fmt(b.cents)+' · doc '+b.doc+'. Contábil: '+dbr(c.data)+' · '+fmt(c.cents)+' · doc '+c.doc+'. Motivo: '+n[0].motivo+'.',
+        {credor:b.credor||c.credor,data:b.data,cents:b.cents,doc:b.doc,acao:'Conferir o lançamento no SIAFIC e corrigir data ou valor.',bid:b.id,cid:c.id});
+      obsB.set(b.id,{k:'divergencia',txt:'Provável par com o lançamento do SIAFIC de '+dbr(c.data)+' ('+n[0].motivo+').'});
+      obsC.set(c.id,{k:'divergencia',txt:'Provável par com o banco de '+dbr(b.data)+' ('+n[0].motivo+').'});
+      continue;
+    }
+    if(k==='tarifa'){tarifas.push(b);obsB.set(b.id,{k:'tarifa',txt:'Tarifa bancária sem lançamento no SIAFIC.'});}
+    else if(k==='bloqueio'){obsB.set(b.id,{k:'bloqueio',txt:'Bloqueio judicial sem desbloqueio no mês e sem lançamento. Acompanhar o processo.'});
+      F('warn','Bloqueio judicial em aberto',fmt(b.cents)+' bloqueados em '+dbr(b.data)+' (doc '+b.doc+'), sem desbloqueio no período e sem lançamento no SIAFIC.',{data:b.data,cents:b.cents,doc:b.doc,acao:'Registrar o bloqueio conforme a rotina da contabilidade e acompanhar a liberação.',bid:b.id});}
+    else if(k==='desbloqueio'){obsB.set(b.id,{k:'bloqueio',txt:'Desbloqueio sem o bloqueio correspondente neste extrato (pode ser de mês anterior).'});
+      F('warn','Desbloqueio judicial sem bloqueio no período',fmt(b.cents)+' em '+dbr(b.data)+' (doc '+b.doc+').',{data:b.data,cents:b.cents,doc:b.doc,acao:'Verificar o bloqueio original em meses anteriores.',bid:b.id});}
+    else if(k==='entrada'){obsB.set(b.id,{k:'entrada',txt:'Entrada no banco sem lançamento de receita no SIAFIC.'});
+      F('warn','Entrada sem lançamento no SIAFIC'+(b.credor?': '+b.credor:''),fmt(b.cents)+' creditados em '+dbr(b.data)+' (doc '+b.doc+'). '+b.text,{credor:b.credor,data:b.data,cents:b.cents,doc:b.doc,acao:'Identificar a origem e lançar a receita ou a transferência.',bid:b.id});}
+    else{obsB.set(b.id,{k:'saida',txt:'Saída no banco sem lançamento de pagamento no SIAFIC.'});
+      F('warn','Pagamento sem lançamento no SIAFIC'+(b.credor?': '+b.credor:''),fmt(b.cents)+' debitados em '+dbr(b.data)+' (doc '+b.doc+'). '+b.text,{credor:b.credor,data:b.data,cents:b.cents,doc:b.doc,acao:'Lançar o pagamento (empenho, liquidação e pagamento) ou verificar se foi indevido.',bid:b.id});}
+  }
+  if(tarifas.length)F('info','Tarifas bancárias a lançar ('+tarifas.length+')','Total de '+fmt(sum(tarifas))+' em tarifas (DOC/TED e pagamentos) que não constam no SIAFIC. Na aba Só no banco, use o filtro Tarifas e o botão Ver por data para lançar o total de cada dia.',{cents:sum(tarifas),acao:'Lançar como despesa bancária no fechamento do mês.'});
+  // só no contábil
+  for(const c of pendC){
+    if(obsC.has(c.id))continue;
+    obsC.set(c.id,{k:'orfao',txt:'Lançado no SIAFIC, mas não aparece no extrato do banco.'});
+    F('crit','Lançamento do SIAFIC sem correspondente no banco'+(c.credor?': '+c.credor:''),dbr(c.data)+' · '+fmt(c.cents)+' · doc '+c.doc+(c.emp?' · empenho '+c.emp:'')+'. '+c.text,{credor:c.credor,data:c.data,cents:c.cents,doc:c.doc,acao:'Verificar se o pagamento saiu de outra conta, se foi lançado em duplicidade ou se ainda não foi compensado.',cid:c.id});
+  }
+  // observações nos pares conciliados
+  const dup=new Map();
+  for(const g of groups){
+    if(g.b.length===1&&g.c.length===1){
+      const b=g.b[0],c=g.c[0];
+      if(g.dias>0)F('info','Data diferente entre banco e contábil'+(c.credor?': '+c.credor:''),'Banco em '+dbr(b.data)+' e SIAFIC em '+dbr(c.data)+' ('+g.dias+' dias), valor '+fmt(b.cents)+', doc banco '+b.doc+' × doc SIAFIC '+c.doc+'.',{credor:c.credor||b.credor,data:b.data,cents:b.cents,doc:b.doc,acao:'Conferir a data de pagamento lançada.'});
+      if(b.credor&&c.credor){const s=nameScore(b.credor,c.credor);
+        if(s<0.5)F(s===0?'warn':'info',(s===0?'Nome do credor diferente: ':'Nome do credor parcialmente diferente: ')+b.credor+' × '+c.credor,dbr(b.data)+' · '+fmt(b.cents)+' · doc banco '+b.doc+' × doc SIAFIC '+c.doc+'. Valor e data batem, mas o nome do favorecido no banco ('+b.credor+') não confere com o credor no SIAFIC ('+c.credor+').',{credor:b.credor+'  ×  '+c.credor,data:b.data,cents:b.cents,doc:b.doc,acao:s===0?'Confirmar se o pagamento foi ao credor correto (pode ser repasse via prefeitura ou outro favorecido).':'Provável abreviação ou razão social diferente. Conferir se necessário.'});}
+      if(!/Exato: data \+ valor \+ documento/.test(g.regra)&&/^Despesa/i.test(c.text)&&tail(b.doc)!==tail(c.doc))
+        F('info','Documento diferente: '+(c.credor||b.credor),'Banco doc '+b.doc+' × SIAFIC doc '+c.doc+', valor '+fmt(b.cents)+' em '+dbr(b.data)+'. Pareado por data e valor.',{credor:c.credor||b.credor,data:b.data,cents:b.cents,doc:b.doc,acao:'Conferir o número do documento no SIAFIC.'});
+    }
+  }
+  for(const c of cont){const k=[c.data,tail(c.doc),c.cents,norm(c.text)].join('|');dup.set(k,(dup.get(k)||[]).concat(c))}
+  for(const [,v] of dup)if(v.length>1&&v[0].cents!==0)F('warn','Possível lançamento duplicado'+(v[0].credor?': '+v[0].credor:''),v.length+' lançamentos idênticos no SIAFIC em '+dbr(v[0].data)+', '+fmt(v[0].cents)+', doc '+v[0].doc+'.',{credor:v[0].credor,data:v[0].data,cents:v[0].cents,doc:v[0].doc,acao:'Verificar se foi lançado duas vezes.'});
+  const neutros=groups.filter(g=>/neutro/.test(g.regra));
+  if(neutros.length)F('info','Bloqueios judiciais já desbloqueados no mês ('+neutros.length+')','Bloqueio e desbloqueio de mesmo valor se anulam no período e não exigem lançamento.',{acao:'Nenhuma.'});
+  /* ===== Saldos e consistência ===== */
+  const liquidoBanco=sum(pendB),liquidoCont=sum(pendC);
+  const checks=[];
+  const contaB=digits(metaB.conta),contaC=digits(metaC.conta);
+  const contaOk=!contaB||!contaC||contaB.endsWith(contaC)||contaC.endsWith(contaB);
+  if(!contaOk)F('crit','Contas diferentes nos dois arquivos','OFX: conta '+metaB.conta+' · SIAFIC: conta '+metaC.conta+'. A conciliação abaixo não é confiável.',{acao:'Enviar os arquivos da mesma conta.'});
+  if(metaB.ini&&metaC.ini&&(metaB.fim.slice(0,7)!==metaC.fim.slice(0,7)))F('warn','Períodos diferentes','OFX até '+dbr(metaB.fim)+' · SIAFIC até '+dbr(metaC.fim)+'.',{acao:'Conferir se os dois arquivos são do mesmo mês.'});
+  const movC=sum(cont);
+  const consist=metaC.saldoFinal===null||metaC.saldoFinal===undefined?null:(metaC.saldoAnt+movC===metaC.saldoFinal);
+  if(consist===false)F('crit','Saldo do SIAFIC não bate com a soma dos lançamentos','Saldo anterior '+fmt(metaC.saldoAnt)+' + movimentação '+fmt(movC)+' = '+fmt(metaC.saldoAnt+movC)+', mas o relatório mostra saldo final '+fmt(metaC.saldoFinal)+'. Pode haver linhas fora da leitura.',{acao:'Reexportar o relatório e conferir.'});
+  const saldoBanco=metaB.ledger;
+  let naoExplicada=null;
+  if(saldoBanco!==null&&metaC.saldoFinal!==null){naoExplicada=metaC.saldoFinal+liquidoBanco-liquidoCont-saldoBanco;
+    if(naoExplicada!==0)F('crit','Diferença de saldo sem explicação',fmt(naoExplicada)+' não são explicados pelas pendências. Saldo SIAFIC '+fmt(metaC.saldoFinal)+', pendências só no banco '+fmt(liquidoBanco)+', só no SIAFIC '+fmt(liquidoCont)+', saldo do banco '+fmt(saldoBanco)+'.',{cents:naoExplicada,acao:'Verificar o saldo anterior das duas bases e o período dos arquivos.'});
+    if(metaB.asof&&metaB.fim&&metaB.asof>metaB.fim)F('info','Saldo do OFX é da data de emissão','O saldo do banco ('+fmt(saldoBanco)+') vale para '+dbr(metaB.asof)+', depois do fim do período ('+dbr(metaB.fim)+'). Movimentos posteriores podem alterar a comparação.',{acao:'Emita o OFX logo após o fechamento do mês, ou confira o saldo no banco.'});}
+  const ord={crit:0,warn:1,info:2};findings.sort((a,b)=>ord[a.sev]-ord[b.sev]);
+  return {bank,cont,groups,pendB,pendC,obsB,obsC,findings,metaB,metaC,saldoBanco,naoExplicada,liquidoBanco,liquidoCont,consist,contaOk,tarifas};
+}
+function fmt(c){return (c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+
+const $=s=>document.querySelector(s);
+const esc=s=>T(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const money=c=>`<span class="num ${c<0?'neg':''}">${fmt(c)}</span>`;
+const fd=d=>d?d.slice(8)+'/'+d.slice(5,7):'';
+let bufB=null,bufC=null,R=null,tab='pendB',q='',kind='',rule='',isSample=false,view='lista';
+function setName(id,box,f){$(id).textContent=f.name+' ('+Math.round(f.size/1024)+' KB)';$(box).classList.add('ok')}
+async function load(which,f){
+  const buf=await f.arrayBuffer();
+  if(which==='B'){bufB=buf;setName('#nameB','#dropB',f)}else{bufC=buf;setName('#nameC','#dropC',f)}
+  $('#go').disabled=!(bufB&&bufC);
+  if(bufB&&bufC)run();
+}
+['B','C'].forEach(w=>{
+  $('#file'+w).onchange=e=>e.target.files[0]&&load(w,e.target.files[0]);
+  const d=$('#drop'+w);
+  d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');
+  d.ondrop=e=>{e.preventDefault();d.classList.remove('over');const f=e.dataTransfer.files[0];if(f)load(w,f)};
+});
+$('#go').onclick=run;
+async function run(){
+  $('#msg').textContent='Lendo os arquivos...';$('#banner').innerHTML='';
+  try{
+    const b=parseOFX(bufB);
+    if(!b.rows.length)throw new Error('Não encontrei lançamentos no arquivo OFX. Confira se é o extrato do banco.');
+    const rows=await readXlsx(bufC);const c=parseCont(rows);
+    if(!c.rows.length)throw new Error('Não encontrei lançamentos no XLSX. O relatório precisa ter data, histórico, documento, débito, crédito e saldo.');
+    $('#msg').textContent='';show(reconcile(b.rows,c.rows,b.meta,c.meta),false);
+  }catch(e){$('#msg').textContent='';$('#banner').innerHTML='<div class="banner err">'+esc(e.message||e)+'</div>'}
+}
+function show(res,sample){R=res;isSample=sample;tab='pendB';q='';kind='';rule='';
+  $('#banner').innerHTML=sample?'<div class="banner">Exemplo: dados reais de outubro/2026 da conta 11.736-6 (PM-FPM). Envie seus arquivos acima para conciliar outra conta ou outro mês.</div>':'';
+  render();}
+const SEVN={crit:'Crítico',warn:'Atenção',info:'Observação'};
+function tipoDe(f){return f.titulo.split(':')[0].replace(/\s*\(\d+\)\s*$/,'').trim()}
+function render(){
+  const {metaB,metaC}=R;
+  const conc=R.groups.filter(g=>!/neutro/.test(g.regra)),neu=R.groups.filter(g=>/neutro/.test(g.regra));
+  const g11=conc.filter(g=>g.b.length===1&&g.c.length===1),gl=conc.filter(g=>!(g.b.length===1&&g.c.length===1));
+  // ponte
+  const steps=[['Saldo final contábil (SIAFIC)',metaC.saldoFinal]];
+  const tar=R.pendB.filter(b=>R.obsB.get(b.id)?.k==='tarifa'),outros=R.pendB.filter(b=>R.obsB.get(b.id)?.k!=='tarifa');
+  if(tar.length)steps.push(['Tarifas bancárias só no banco ('+tar.length+')',sum(tar)]);
+  const maxInd=4;outros.slice(0,maxInd).forEach(b=>steps.push([(b.credor||b.text.slice(0,32))+' · '+fd(b.data),b.cents]));
+  if(outros.length>maxInd)steps.push(['Outros só no banco ('+(outros.length-maxInd)+')',sum(outros.slice(maxInd))]);
+  if(R.pendC.length)steps.push(['Só no SIAFIC ('+R.pendC.length+')',-sum(R.pendC)]);
+  const calc=steps.reduce((s,x)=>s+(x[1]||0),0);
+  const dif=R.saldoBanco===null?null:calc-R.saldoBanco;
+  const ok=dif===0;
+  let h=`<section class="card" aria-label="Fechamento do saldo"><div class="row" style="justify-content:space-between"><h2>Do saldo contábil ao saldo do banco</h2>
+   <div class="status ${dif===null?'':ok?'ok':'bad'}"><span class="dot"></span><span>${dif===null?'Saldo do banco não informado no OFX':ok?'Fecha: diferença não explicada R$ 0,00':'Não fecha: diferença não explicada de R$ '+fmt(dif)}</span></div></div>
+   <p class="note">${esc(metaB.banco||'Banco')} · agência ${esc(metaB.agencia||'')} · conta ${esc(metaB.conta)} · SIAFIC conta ${esc(metaC.conta)} ${metaC.descr?'('+esc(metaC.descr)+')':''} · período ${dbr(metaC.ini)} a ${dbr(metaC.fim)}</p>
+   <div class="steps">${steps.map((s,i)=>`<div class="step"><span class="l">${i?'(+) ':''}${esc(s[0])}</span><span class="v ${s[1]<0?'neg':''}">${fmt(s[1])}</span></div>`).join('')}
+   <div class="step ${dif===null||ok?'end':'bad'}"><span class="l">= Saldo calculado do banco</span><span class="v">${fmt(calc)}</span></div>
+   <div class="step"><span class="l">Saldo do banco no OFX</span><span class="v">${R.saldoBanco===null?'—':fmt(R.saldoBanco)}</span></div></div></section>`;
+  const nf=s=>R.findings.filter(f=>f.sev===s).length;
+  h+=`<section class="kpis">${[['Lançamentos no SIAFIC',R.cont.length,(R.cont.length-R.pendC.length)+' conciliados'],['Lançamentos no banco',R.bank.length,(R.bank.length-R.pendB.length)+' conciliados'],['Conciliados 1 para 1',g11.length,'data e valor'],['Lotes e agregados',gl.length,'soma de itens'],['Só no banco',R.pendB.length,fmt(R.liquidoBanco)+' líquido'],['Só no SIAFIC',R.pendC.length,fmt(R.liquidoCont)+' líquido']].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('')}</section>`;
+  // pontos de atenção
+  const byT=new Map();for(const f of R.findings){const k=f.sev+'|'+tipoDe(f);if(!byT.has(k))byT.set(k,{sev:f.sev,tipo:tipoDe(f),items:[]});byT.get(k).items.push(f)}
+  h+=`<section class="att"><div class="row" style="justify-content:space-between"><h2>Pontos de atenção · ${nf('crit')} críticos · ${nf('warn')} de atenção · ${nf('info')} observações</h2><button class="btn sec" id="cpAtt">Copiar para o Excel</button></div>`;
+  if(!byT.size)h+='<div class="banner">Nenhuma divergência encontrada.</div>';
+  for(const g of byT.values()){
+    h+=`<details class="fg" ${g.sev!=='info'?'open':''}><summary><span class="pill ${g.sev}">${SEVN[g.sev]}</span><span class="t">${esc(g.tipo)}</span><span class="n">${g.items.length} ${g.items.length===1?'item':'itens'}</span></summary><div class="tw"><table><thead><tr><th>Credor / favorecido</th><th>Data</th><th class="r">Valor</th><th>Documento</th><th>O que foi encontrado</th><th>O que fazer</th></tr></thead><tbody>${g.items.map(f=>`<tr><td class="cell">${esc(f.credor||'—')}</td><td class="num">${f.data?fd(f.data):''}</td><td class="r">${f.cents!==undefined?money(f.cents):''}</td><td class="num">${esc(f.doc||'')}</td><td class="cell">${esc(f.detalhe)}</td><td class="cell">${esc(f.acao||'')}</td></tr>`).join('')}</tbody></table></div></details>`;
+  }
+  h+='</section>';
+  const TABS=[['pendB','Só no banco',R.pendB.length],['pendC','Só no SIAFIC',R.pendC.length],['c11','Conciliados 1:1',g11.length],['lote','Lotes e agregados',gl.length],['neu','Bloqueios neutros',neu.length]];
+  h+=`<section style="display:flex;flex-direction:column;gap:12px"><div class="tabs" role="tablist">${TABS.map(t=>`<button class="tab" role="tab" aria-selected="${t[0]===tab}" data-t="${t[0]}">${t[1]}<span class="c">${t[2]}</span></button>`).join('')}</div><div id="tabbody" style="display:flex;flex-direction:column;gap:12px"></div></section>`;
+  $('#out').innerHTML=h;R._g11=g11;R._gl=gl;R._neu=neu;
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;q='';kind='';rule='';document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===b));drawTab()});
+  $('#cpAtt').onclick=()=>copy(['Gravidade\tTipo\tCredor\tData\tValor\tDocumento\tEncontrado\tAção'].concat(R.findings.map(f=>[SEVN[f.sev],tipoDe(f),f.credor||'',f.data?dbr(f.data):'',f.cents!==undefined?fmt(f.cents):'',f.doc||'',f.detalhe,f.acao||''].join('\t'))).join('\n'),$('#cpAtt'));
+  drawTab();
+}
+function copy(text,btn){
+  const done=()=>{const o=btn.textContent;btn.textContent='Copiado. Cole no Excel.';setTimeout(()=>btn.textContent=o,2500)};
+  const fb=()=>{let t=document.getElementById('fb');if(!t){t=document.createElement('textarea');t.id='fb';t.className='fb';btn.parentElement.after(t)}t.value=text;t.select();btn.textContent='Selecione e copie o texto abaixo'};
+  try{navigator.clipboard.writeText(text).then(done,fb)}catch(e){fb()}
+}
+function drawTab(){
+  const m=s=>!q||s.toLowerCase().includes(q.toLowerCase());
+  let h='',cp=null;
+  const search=`<input type="search" id="q" placeholder="Filtrar por credor, histórico, documento ou valor" value="${esc(q)}" aria-label="Filtrar">`;
+  if(tab==='pendB'){
+    const ks={tarifa:'Tarifas',bloqueio:'Bloqueios',entrada:'Entradas',saida:'Pagamentos',divergencia:'Possível divergência'};
+    const rows=R.pendB.filter(b=>{const o=R.obsB.get(b.id)||{};return (!kind||o.k===kind)&&m([b.text,b.credor,b.doc,fmt(b.cents),o.txt].join(' '))}).sort((x,y)=>x.data.localeCompare(y.data)||x.id-y.id);
+    // visão por data: tarifas somadas por dia, demais itens um a um
+    const lines=[];const tm=new Map();
+    for(const b of rows){const k=R.obsB.get(b.id)?.k;
+      if(k==='tarifa'){const key=b.data;if(!tm.has(key)){const l={data:b.data,tipo:'Tarifas bancárias',qtd:0,cents:0,det:''};tm.set(key,l);lines.push(l)}const l=tm.get(key);l.qtd++;l.cents+=b.cents}
+      else lines.push({data:b.data,tipo:(ks[k]||'Outros')+(b.credor?': '+b.credor:''),qtd:1,cents:b.cents,det:b.text+' · doc '+b.doc})}
+    lines.sort((x,y)=>x.data.localeCompare(y.data));
+    const bar=`<div class="row">${search}${Object.entries(ks).filter(([k])=>R.pendB.some(b=>R.obsB.get(b.id)?.k===k)).map(([k,v])=>`<button class="chip" aria-pressed="${kind===k}" data-k="${k}">${v} · ${R.pendB.filter(b=>R.obsB.get(b.id)?.k===k).length}</button>`).join('')}<button class="chip" aria-pressed="${view==='data'}" id="vw">Ver por data</button><button class="btn sec" id="cp">Copiar para o Excel</button></div>`;
+    if(view==='data'){
+      h+=`<p class="note">Valores somados por data, em ordem crescente, para lançar dia a dia no SIAFIC. As tarifas de cada dia aparecem como uma linha só.</p>${bar}
+      <div class="tw"><table><thead><tr><th>Data</th><th>O que lançar</th><th class="r">Qtde</th><th class="r">Valor do dia</th><th>Detalhe</th></tr></thead><tbody>${lines.map(l=>`<tr><td class="num">${dbr(l.data)}</td><td class="cell">${esc(l.tipo)}</td><td class="r num">${l.qtd}</td><td class="r">${money(l.cents)}</td><td class="cell">${esc(l.det)}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum lançamento.</td></tr>'}<tr><td colspan="2"><b>Total exibido (${rows.length} lançamentos do banco)</b></td><td class="r num">${rows.length}</td><td class="r">${money(sum(rows))}</td><td></td></tr></tbody></table></div>`;
+      cp=()=>['Data\tO que lançar\tQtde\tValor do dia'].concat(lines.map(l=>[dbr(l.data),l.tipo,l.qtd,fmt(l.cents)].join('\t'))).concat(['Total\t\t'+rows.length+'\t'+fmt(sum(rows))]).join('\n');
+    } else {
+      h+=`<p class="note">Estão no extrato do banco e não têm lançamento correspondente no SIAFIC. Use "Ver por data" para ver o total de cada dia.</p>${bar}
+      <div class="tw"><table><thead><tr><th>Data</th><th>Credor / favorecido</th><th>Histórico no banco</th><th>Documento</th><th class="r">Valor</th><th>Observação</th></tr></thead><tbody>${rows.map(b=>`<tr><td class="num">${fd(b.data)}</td><td class="cell">${esc(b.credor||'—')}</td><td class="cell">${esc(b.text)}</td><td class="num">${esc(b.doc)}</td><td class="r">${money(b.cents)}</td><td class="cell">${esc(R.obsB.get(b.id)?.txt||'')}</td></tr>`).join('')||'<tr><td colspan="6">Nenhum lançamento.</td></tr>'}<tr><td colspan="4"><b>Total exibido (${rows.length})</b></td><td class="r">${money(sum(rows))}</td><td></td></tr></tbody></table></div>`;
+      cp=()=>['Data\tCredor\tHistórico\tDocumento\tValor\tObservação'].concat(rows.map(b=>[dbr(b.data),b.credor,b.text,b.doc,fmt(b.cents),R.obsB.get(b.id)?.txt||''].join('\t'))).join('\n');
+    }
+  } else if(tab==='pendC'){
+    const rows=R.pendC.filter(c=>m([c.text,c.credor,c.doc,fmt(c.cents)].join(' ')));
+    h+=`<p class="note">Estão lançados no SIAFIC e não aparecem no extrato do banco.</p><div class="row">${search}<button class="btn sec" id="cp">Copiar para o Excel</button></div><div class="tw"><table><thead><tr><th>Data</th><th>Credor</th><th>Histórico no SIAFIC</th><th>Documento</th><th class="r">Valor</th><th>Observação</th></tr></thead><tbody>${rows.map(c=>`<tr><td class="num">${fd(c.data)}</td><td class="cell">${esc(c.credor||'—')}</td><td class="cell">${esc(c.text)}</td><td class="num">${esc(c.doc)}</td><td class="r">${money(c.cents)}</td><td class="cell">${esc(R.obsC.get(c.id)?.txt||'')}</td></tr>`).join('')||'<tr><td colspan="6">Nenhum lançamento pendente no SIAFIC.</td></tr>'}</tbody></table></div>`;
+    cp=()=>['Data\tCredor\tHistórico\tDocumento\tValor'].concat(rows.map(c=>[dbr(c.data),c.credor,c.text,c.doc,fmt(c.cents)].join('\t'))).join('\n');
+  } else if(tab==='c11'){
+    const regras=[...new Set(R._g11.map(g=>g.regra))];
+    const rows=R._g11.filter(g=>(!rule||g.regra===rule)&&m([g.b[0].text,g.c[0].text,g.b[0].doc,g.c[0].doc,fmt(g.b[0].cents)].join(' '))).sort((x,y)=>x.b[0].data.localeCompare(y.b[0].data)||x.id-y.id);
+    h+=`<p class="note">Mesma data, mesmo valor e sentido invertido. O documento reforça o par quando coincide.</p><div class="row">${search}<select id="rf" aria-label="Regra"><option value="">Todas as regras</option>${regras.map(r=>`<option ${rule===r?'selected':''}>${esc(r)}</option>`).join('')}</select></div><div class="tw"><table><thead><tr><th>Banco</th><th>SIAFIC</th><th class="r">Valor</th><th>Regra</th></tr></thead><tbody>${rows.map(g=>{const b=g.b[0],c=g.c[0];return `<tr><td class="cell"><span class="num">${fd(b.data)}</span> ${esc(b.text)}<small class="num">doc ${esc(b.doc)}</small></td><td class="cell"><span class="num">${fd(c.data)}</span>${g.dias?` <span class="tag w">${g.dias}d</span>`:''} ${esc(c.text)}<small class="num">doc ${esc(c.doc)}</small></td><td class="r">${money(b.cents)}</td><td><span class="tag">${esc(g.regra.replace('Exato: ',''))}</span></td></tr>`}).join('')||'<tr><td colspan="4">Nenhum resultado.</td></tr>'}</tbody></table></div>`;
+  } else if(tab==='lote'){
+    const rows=R._gl.filter(g=>m(g.regra+' '+g.b.map(x=>x.text).join(' ')+' '+g.c.map(x=>x.text+x.doc).join(' '))).sort((x,y)=>Math.min(...x.b.map(i=>Date.parse(i.data)))-Math.min(...y.b.map(i=>Date.parse(i.data)))||x.id-y.id);
+    h+=`<p class="note">Um lançamento do banco corresponde à soma de vários do SIAFIC, ou o inverso. Abra os itens para conferir.</p><div class="row">${search}</div><div class="tw"><table><thead><tr><th>Regra</th><th class="r">Banco</th><th class="r">SIAFIC</th><th>Itens</th><th class="r">Soma</th></tr></thead><tbody>${rows.map(g=>`<tr><td class="cell"><span class="tag">${esc(g.regra.replace(/ \(ex\..*\)/,''))}</span><small class="num">${fd(g.b[0].data)} · doc ${esc(g.c[0]?.doc||'')}</small></td><td class="r num">${g.b.length}</td><td class="r num">${g.c.length}</td><td class="cell"><details class="items"><summary>Ver itens</summary>${g.b.map(x=>`<small>Banco ${fd(x.data)}: ${esc(x.text)} · ${fmt(x.cents)}</small>`).join('')}${g.c.map(x=>`<small>SIAFIC ${fd(x.data)}: ${esc(x.text.slice(0,110))} · ${fmt(x.cents)}</small>`).join('')}</details></td><td class="r">${money(sum(g.b))}</td></tr>`).join('')}</tbody></table></div>`;
+  } else {
+    const it=R._neu.flatMap(g=>g.b).sort((a,b)=>a.data.localeCompare(b.data));
+    h+=`<p class="note">Bloqueios e desbloqueios judiciais de mesmo valor, que se anulam no período.</p><div class="tw"><table><thead><tr><th>Data</th><th>Histórico</th><th>Documento</th><th class="r">Valor</th></tr></thead><tbody>${it.map(x=>`<tr><td class="num">${fd(x.data)}</td><td class="cell">${esc(x.text)}</td><td class="num">${esc(x.doc)}</td><td class="r">${money(x.cents)}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum.</td></tr>'}</tbody></table></div>`;
+  }
+  $('#tabbody').innerHTML=h;
+  const qi=$('#q');if(qi)qi.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;drawTab();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
+  const rs=$('#rf');if(rs)rs.onchange=e=>{rule=e.target.value;drawTab()};
+  document.querySelectorAll('.chip[data-k]').forEach(b=>b.onclick=()=>{kind=kind===b.dataset.k?'':b.dataset.k;drawTab()});
+  const vw=$('#vw');if(vw)vw.onclick=()=>{view=view==='data'?'lista':'data';drawTab()};
+  const cb=$('#cp');if(cb&&cp)cb.onclick=()=>copy(cp(),cb);
+}
+
+</script>
